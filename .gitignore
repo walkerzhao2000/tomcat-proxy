@@ -1,0 +1,9 @@
+webapps/.idea
+logs
+work
+webapps/tomcat-webapps.iml
+workspace/location_proxy/.gradle
+workspace/location_proxy/.idea
+workspace/location_proxy/build
+webapps/location/WEB-INF/classes
+webapps/location/WEB-INF/lib
