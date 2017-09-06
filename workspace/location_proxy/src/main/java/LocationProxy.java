@@ -20,7 +20,7 @@ public class LocationProxy extends HttpServlet {
 
     private static final Logger Log = Logger.getLogger(LocationProxy.class.getName());
     private static final long serialVersionUID = 1L;
-    private static final String mUrl = "https://api.skyhookwireless.com/wps2/location";
+    private static final String mUrl = "";
 
     private boolean authenticate(HttpServletRequest request) {
         String[] values = getCredential(request);
