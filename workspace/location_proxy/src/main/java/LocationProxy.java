@@ -1,6 +1,8 @@
 
 import java.io.*;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.util.Base64;
 import java.util.logging.Logger;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -8,6 +10,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.bind.DatatypeConverter;
 
 /**
  * Http request proxy.
@@ -17,7 +20,44 @@ public class LocationProxy extends HttpServlet {
 
     private static final Logger Log = Logger.getLogger(LocationProxy.class.getName());
     private static final long serialVersionUID = 1L;
-    private static final String mUrl = "";
+    private static final String mUrl = "https://api.skyhookwireless.com/wps2/location";
+
+    private boolean authenticate(HttpServletRequest request) {
+        String[] values = getCredential(request);
+        String username = values[0];
+        byte[] password = DatatypeConverter.parseHexBinary(values[1]);
+        Log.info("username=" + username);
+        Log.info("password=" + values[1]);
+
+        // verify authentication
+        MySqlAccessor db = new MySqlAccessor();
+        byte[] cachedPassword = db.readCredential(username);
+        Log.info("cachedPassword=" + DatatypeConverter.printHexBinary(cachedPassword));
+        if (password.length != cachedPassword.length) {
+            return false;
+        }
+        for (int i=0; i<cachedPassword.length; ++i) {
+            if (password[i] != cachedPassword[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String[] getCredential(HttpServletRequest request) {
+        // Extract username:password
+        final String authorization = request.getHeader("authorization");
+        if (authorization != null && authorization.startsWith("basic")) {
+            // Authorization: Basic base64credentials
+            String base64Credentials = authorization.substring("basic".length()).trim();
+            String credentials = new String(Base64.getDecoder().decode(base64Credentials),
+                    Charset.forName("UTF-8"));
+            // credentials = username:password
+            return credentials.split(":", 2);
+        } else {
+            return new String[]{"", ""};
+        }
+    }
 
     @Override
     public void doGet(HttpServletRequest request,
@@ -25,6 +65,17 @@ public class LocationProxy extends HttpServlet {
         throws IOException, ServletException {
 
 //        Log.info("LocationProxy started");
+
+        // verify authentication
+        if (!authenticate(request)) {
+            String[] values = getCredential(request);
+            String username = values[0];
+            String password = values[1];
+            Log.info("authentication failed: username=" + username + ",password=" + password);
+            return;
+        }
+
+        // forward request
         URL url = new URL(mUrl);
         HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
         OutputStream out = null;
