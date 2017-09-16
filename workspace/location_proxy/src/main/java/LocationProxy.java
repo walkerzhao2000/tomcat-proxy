@@ -2,6 +2,7 @@
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.sql.SQLException;
 import java.util.Base64;
 import java.util.logging.Logger;
 
@@ -27,21 +28,25 @@ public class LocationProxy extends HttpServlet {
         String username = values[0];
         byte[] password = DatatypeConverter.parseHexBinary(values[1]);
         Log.info("username=" + username);
-        Log.info("password=" + values[1]);
+//        Log.info("password=" + values[1]);
 
         // verify authentication
-        MySqlAccessor db = new MySqlAccessor();
-        byte[] cachedPassword = db.readCredential(username);
-        Log.info("cachedPassword=" + DatatypeConverter.printHexBinary(cachedPassword));
-        if (password.length != cachedPassword.length) {
-            return false;
-        }
-        for (int i=0; i<cachedPassword.length; ++i) {
-            if (password[i] != cachedPassword[i]) {
+        try (MySqlAccessor db = new MySqlAccessor()) {
+            byte[] cachedPassword = db.readCredential(username);
+//          Log.info("cachedPassword=" + DatatypeConverter.printHexBinary(cachedPassword));
+            if (password.length != cachedPassword.length) {
                 return false;
             }
+            for (int i=0; i<cachedPassword.length; ++i) {
+                if (password[i] != cachedPassword[i]) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (IOException | SQLException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return false;
         }
-        return true;
     }
 
     private String[] getCredential(HttpServletRequest request) {
@@ -66,13 +71,20 @@ public class LocationProxy extends HttpServlet {
 
 //        Log.info("LocationProxy started");
 
+        String[] values = getCredential(request);
+        if (values.length != 2) {
+            Log.info("HTTP request format error: this request does not contain proper format 'username:password'");
+            return;
+        }
+        String username = values[0];
+        String password = values[1];
+
         // verify authentication
         if (!authenticate(request)) {
-            String[] values = getCredential(request);
-            String username = values[0];
-            String password = values[1];
             Log.info("authentication failed: username=" + username + ",password=" + password);
             return;
+        } else {
+            Log.info("authentication succeeded: username=\" + username");
         }
 
         // forward request
@@ -163,5 +175,12 @@ public class LocationProxy extends HttpServlet {
         doGet(request, response);
     }
 
+//    public static void main(String[] args) throws Exception {
+//        try (MySqlAccessor dao = new MySqlAccessor()) {
+//            byte[] password = dao.readCredential("wjao");
+//            System.out.println(DatatypeConverter.printHexBinary(password));
+//            dao.addUser("testUser", "1234567890123456789012345678901234567890", "1234567890123456", "test@test.com", 1);
+//        }
+//    }
 }
 
